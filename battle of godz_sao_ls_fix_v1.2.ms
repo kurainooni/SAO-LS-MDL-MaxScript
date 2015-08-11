@@ -476,9 +476,11 @@ for x=1 to 	ModelCount do (
 			vx = ReadBEfloat f
 			vy = ReadBEfloat f
 			vz = ReadBEfloat f
-			fseek f 0x28 #seek_cur
+			fseek f 0x24 #seek_cur
+			tu=ReadBEHalfFloat f
+			tv=ReadBEHalfFloat f
 			append Vert_array([vx,-1*vz,vy]*fscale)
-			append UV_array[0,0,0]
+			append UV_array([tu,(tv*-1),0]*2)
 			)
 		)
 		
