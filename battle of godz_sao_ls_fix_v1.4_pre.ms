@@ -368,7 +368,7 @@ for x=1 to 	ModelCount do (
 			tv=ReadBEHalfFloat f
 			fseek f 0x04 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
-			append UV_array[tu,tv,0]
+			append UV_array([tu,(tv*-1),0]*2)
 			)
 		)
 		
@@ -445,7 +445,7 @@ for x=1 to 	ModelCount do (
 			tv=ReadBEHalfFloat f
 			fseek f 0x08 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
-			append UV_array([(tu*-1),tv,0]*2)
+			append UV_array([(tu*-2),((tv*-2)+1),0])
 			)
 		)
 		
@@ -454,9 +454,12 @@ for x=1 to 	ModelCount do (
 			vx = ReadBEfloat f
 			vy = ReadBEfloat f
 			vz = ReadBEfloat f
-			fseek f 0x20 #seek_cur
+			fseek f 0x10 #seek_cur
+			tu=ReadBEHalfFloat f
+			tv=ReadBEHalfFloat f
+			fseek f 0x0c #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
-			append UV_array[0,0,0]
+			append UV_array([(tu*-2),(tv*-2+1)*1.1,0])
 			)
 		)
 		
@@ -520,9 +523,12 @@ for x=1 to 	ModelCount do (
 			vx = ReadBEfloat f
 			vy = ReadBEfloat f
 			vz = ReadBEfloat f
-			fseek f 0x34 #seek_cur
+			fseek f 0x24 #seek_cur
+			tu=ReadBEHalfFloat f
+			tv=ReadBEHalfFloat f
+			fseek f 0x0c #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
-			append UV_array[0,0,0]
+			append UV_array([(tu*1),(tv*-1)+1,0]*2)
 			)
 		)
 		
