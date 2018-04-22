@@ -1,30 +1,58 @@
 fn ReadBEword fstream = (
-return (bit.swapBytes (readshort fstream #unsigned) 1 2)
+	return (bit.swapBytes (readshort fstream #unsigned) 1 2)
+)
+
+fn ReadLEword fstream = (
+	return (readshort fstream #unsigned)
+)
+
+fn ReadEword fstream = (
+	if ENDIAN=='ENDIBIGE' then (return ReadBEword fstream) else (return ReadLEword fstream)
 )
 
 fn convertTo32 input16 = (
-      inputAsInt = input16
-      sign = bit.get inputAsInt 16
-      exponent = (bit.shift (bit.and inputAsInt (bit.hexasint "7C00")) -10) as integer - 16
-      fraction = bit.and inputAsInt (bit.hexasint "03FF")
-      if sign==true then sign = 1 else sign = 0
-      exponentF = exponent + 127
-      --Ouput 32 bit integer representing a 32 bit float
-      outputAsFloat = bit.or (bit.or (bit.shift fraction 13) (bit.shift exponentF 23)) (bit.shift sign 31)
-      --Output Check   
-      return bit.intasfloat outputasfloat
+    inputAsInt = input16
+    sign = bit.get inputAsInt 16
+    exponent = (bit.shift (bit.and inputAsInt (bit.hexasint "7C00")) -10) as integer - 16
+    fraction = bit.and inputAsInt (bit.hexasint "03FF")
+    if sign==true then sign = 1 else sign = 0
+    exponentF = exponent + 127
+    --Ouput 32 bit integer representing a 32 bit float
+    outputAsFloat = bit.or (bit.or (bit.shift fraction 13) (bit.shift exponentF 23)) (bit.shift sign 31)
+    --Output Check   
+    return bit.intasfloat outputasfloat
 )
 
 fn ReadBEHalfFloat fstream = (
-return convertTo32(ReadBEword fstream)
+	return convertTo32(ReadBEword fstream)
+)
+
+fn ReadLEHalfFloat fstream = (
+	return convertTo32(ReadLEword fstream)
+)
+
+fn ReadEHalfFloat fstream = (
+	return convertTo32(ReadEword fstream)
 )
 
 fn ReadBEShort fstream = (
-short = readshort fstream #unsigned
-short = bit.swapBytes short 2 1
-b = (bit.get short 16)
-for i = 17 to 32 do short = bit.set short i b
-return short
+	short = readshort fstream #unsigned
+	short = bit.swapBytes short 2 1
+	b = (bit.get short 16)
+	for i = 17 to 32 do short = bit.set short i b
+	return short
+)
+
+fn ReadLEShort fstream = (
+	short = readshort fstream #unsigned
+	--short = bit.swapBytes short 2 1
+	b = (bit.get short 16)
+	for i = 17 to 32 do short = bit.set short i b
+	return short
+)
+
+fn ReadEShort fstream = (
+	if ENDIAN=='ENDIBIGE' then return ReadBEShort fstream else return ReadLEShort fstream
 )
 
 fn floatSwap2 f = (
@@ -37,18 +65,38 @@ fn floatSwap2 f = (
 )   
 
 fn ReadBEword fstream = (
-return (bit.swapBytes (readshort fstream #unsigned) 1 2)
+	return (bit.swapBytes (readshort fstream #unsigned) 1 2)
+)
+
+fn ReadLEword fstream = (
+	return (readshort fstream #unsigned)
 )
 
 fn ReadBElong fstream = (
-long = readlong fstream
-long = bit.swapBytes long 1 4
-long = bit.swapBytes long 2 3
-return long
+	long = readlong fstream
+	long = bit.swapBytes long 1 4
+	long = bit.swapBytes long 2 3
+	return long
+)
+
+fn ReadLElong fstream = (
+	return readlong fstream
+)
+
+fn ReadElong fstream = (
+	if ENDIAN=='ENDIBIGE' then return ReadBElong fstream else return ReadLElong fstream
 )
 
 fn ReadBEfloat fstream = (
-return floatSwap2(readfloat fstream)
+	return floatSwap2(readfloat fstream)
+)
+
+fn ReadLEfloat fstream = (
+	return readfloat fstream
+)
+
+fn ReadEfloat fstream =(
+	if ENDIAN=='ENDIBIGE' then return ReadBEfloat (fstream) else return ReadLEfloat (fstream)
 )
 
 fn ReadFixedString bstream fixedLen = (
@@ -88,37 +136,56 @@ struct weight_data (
    boneids,weights
 )
 
-fname = GetOpenFileName caption:"Battle of Z" types:"(*.mdl)|*.mdl"
-f = fopen fname "rb"   --open file in read only format
-clearlistener()
-fscale=50
-delete $*
+isBigEndian=1
 
-ENDIBIGE = ReadFixedString f 8
-fseek f 0x08 #seek_cur
-MDL = ReadFixedString f 3
-fseek f 0xd0 #seek_set
--- MDL HDET --
-MDL_HDET = ReadFixedString f 8
-HDETBlockLength=ReadBElong f
-null=ReadBElong f
-TextureCount=ReadBElong f
-MTLBDataCount=ReadBElong f	--blocks 0x1a0 long
-ukw2=ReadBElong f
-BoneCount=ReadBElong f	--blocks 0x50 long
-ukw5=ReadBElong f
-fseek f 0x2c #seek_cur
+rollout mdlImportRollout "MDL importer" width:168 height:184
+(
+	button btnOpenMDL "Open MDL" pos:[10,48] width:144 height:32
+	label lbl1 "SAO:LS and DBZ BoZ importer" pos:[8,16] width:144 height:24
+	label lbl5 "Original script by sleepyzay, updated by KuraiNoOni for SAO:LS" pos:[12,128] width:144 height:46
+	checkbox endianType "Big Endian" pos:[12,96] width:144 height:20 checked:true
+	on btnOpenMDL pressed do
+	(
+		OpenMDLFile()
+		)
+	on endianType changed state do
+	(
+		isBigEndian = endianType.value
+	)
+)
+
+fn OpenMDLFile = (
+	fname = GetOpenFileName caption:"Battle of Z|SAO Lost Song" types:"(*.mdl)|*.mdl"
+	f = fopen fname "rb"   --open file in read only format
+	clearlistener()
+	fscale=50
+	delete $*
+
+	ENDIAN = ReadFixedString f 8
+	fseek f 0x08 #seek_cur
+	MDL = ReadFixedString f 3
+	fseek f 0xd0 #seek_set
+	-- MDL HDET --
+	MDL_HDET = ReadFixedString f 8
+	HDETBlockLength=ReadLElong f
+	null=ReadLElong f
+	TextureCount=ReadLElong f
+	MTLBDataCount=ReadLElong f	--blocks 0x1a0 long
+	ukw2=ReadLElong f
+	BoneCount=ReadLElong f	--blocks 0x50 long
+	ukw5=ReadLElong f
+	fseek f 0x2c #seek_cur
 
 Print ("Texture count is "+((TextureCount)as string))
 
 -- MDL STHB --			name data
 MDL_STHB = ReadFixedString f 8
-STHBBlockLength=ReadBElong f
-null=ReadBElong f
-NameCount=ReadBElong f
-STHBOffsetLength=ReadBElong f
-TextLength=ReadBElong f
-null=ReadBElong f
+STHBBlockLength=ReadLElong f
+null=ReadLElong f
+NameCount=ReadLElong f
+STHBOffsetLength=ReadLElong f
+TextLength=ReadLElong f
+null=ReadLElong f
 fseek f STHBOffsetLength #seek_cur
 fseek f TextLength #seek_cur
 
@@ -127,37 +194,37 @@ Print ("Name count is "+((NameCount)as string))
 
 -- MDL MTDT --			material data?
 MDL_MTDT = ReadFixedString f 8
-MTDTLength=ReadBElong f
+MTDTLength=ReadLElong f
 fseek f 0x04 #seek_cur
 fseek f MTDTLength #seek_cur
 
 -- MDL IMGB --			dunno what this is
 MDLIMGB = ReadFixedString f 8 
-IMGBLength=ReadBElong f
+IMGBLength=ReadLElong f
 fseek f 0x04 #seek_cur
 fseek f IMGBLength #seek_cur
 
 -- MDL MTLB --			stuff might be here
 MDLMTLB = ReadFixedString f 8 
-MTLBLength=ReadBElong f
+MTLBLength=ReadLElong f
 fseek f 0x04 #seek_cur
 fseek f MTLBLength #seek_cur
 
 -- MDL NDEB --			bone data
 MDLNDEB = ReadFixedString f 8 
-NDEBLength=ReadBElong f
+NDEBLength=ReadLElong f
 fseek f 0x04 #seek_cur
 fseek f NDEBLength #seek_cur
 -- BNArr = #()
 -- for x=1 to BoneCount do (
 -- 	fseek f 0x4 #seek_cur
--- 	BoneParentID = ReadBElong f + 1
+-- 	BoneParentID = ReadLElong f + 1
 -- 	fseek f 0x08 #seek_cur
 
--- 	m11 = ReadBEfloat f; m12 = ReadBEfloat f; m13 = ReadBEfloat f; m14 = ReadBEfloat f
--- 	m21 = ReadBEfloat f; m22 = ReadBEfloat f; m23 = ReadBEfloat f; m24 = ReadBEfloat f
--- 	m31 = ReadBEfloat f; m32 = ReadBEfloat f; m33 = ReadBEfloat f; m34 = ReadBEfloat f
--- 	m41 = ReadBEfloat f; m42 = ReadBEfloat f; m43 = ReadBEfloat f; m44 = ReadBEfloat f
+-- 	m11 = ReadLEfloat f; m12 = ReadLEfloat f; m13 = ReadLEfloat f; m14 = ReadLEfloat f
+-- 	m21 = ReadLEfloat f; m22 = ReadLEfloat f; m23 = ReadLEfloat f; m24 = ReadLEfloat f
+-- 	m31 = ReadLEfloat f; m32 = ReadLEfloat f; m33 = ReadLEfloat f; m34 = ReadLEfloat f
+-- 	m41 = ReadLEfloat f; m42 = ReadLEfloat f; m43 = ReadLEfloat f; m44 = ReadLEfloat f
 -- 	tfm = matrix3 [m11,m21,m31,m41] [m12,m22,m32,m42] [m13,m23,m33,m43] [m14,m24,m34,m44]	
 -- 	
 -- 	newBone = bonesys.createbone	\
@@ -199,27 +266,28 @@ Print ("Fork @ 0x"+((bit.intAsHex(BackJump))as string))
 
 MDL = ReadFixedString f 8
 if MDL == "MDL INVB" then(
+	ModelCount=0
 	fseek f BackJump #seek_set
 	-- MDL INVB --		
 	MDLINVB = ReadFixedString f 8 
-	INVBLength=ReadBElong f
-	null=ReadBElong f
-	ukw=ReadBElong f
-	NodeCount=ReadBElong f
-	ukw2=ReadBElong f
-	NodeTableLength=ReadBElong f
-	ukw3=ReadBElong f
-	NodeDataLength=ReadBElong f
+	INVBLength=ReadLElong f
+	null=ReadLElong f
+	ukw=ReadLElong f
+	NodeCount=ReadLElong f
+	ukw2=ReadLElong f
+	NodeTableLength=ReadLElong f
+	ukw3=ReadLElong f
+	NodeDataLength=ReadLElong f
 	fseek f 0x08 #seek_cur
 	fseek f NodeTableLength #seek_cur
 	fseek f NodeDataLength #seek_cur
-	
+	ftell
 	-- MDL GEOB --
 	MDLGEOB = ReadFixedString f 8 
-	GEOBLength=ReadBElong f
-	GEOBBlockLength=ReadBElong f
-	ukw9=ReadBElong f	
-	ModelCount=ReadBElong f
+	GEOBLength=ReadLElong f
+	GEOBBlockLength=ReadLElong f
+	ukw9=ReadLElong f	
+	ModelCount=ReadLElong f
 	fseek f 0x08 #seek_cur
 	
 	Print ("bone count is "+(BoneCount)as string)	
@@ -230,10 +298,10 @@ If MDL == "MDL GEOB" then(
 	fseek f BackJump #seek_set
 	-- MDL GEOB --
 	MDLGEOB = ReadFixedString f 8 
-	GEOBLength=ReadBElong f
-	GEOBBlockLength=ReadBElong f
-	ukw9=ReadBElong f	
-	ModelCount=ReadBElong f
+	GEOBLength=ReadLElong f
+	GEOBBlockLength=ReadLElong f
+	ukw9=ReadLElong f	
+	ModelCount=ReadLElong f
 	fseek f 0x08 #seek_cur
 	
 	Print ("model count is "+(ModelCount)as string)	
@@ -265,11 +333,11 @@ for x=1 to 	ModelCount do (
 	
 	-- MDL GEO --
 	MDLGEO[x] = ReadFixedString f 8 
-	GEOLength[x]=ReadBElong f
-	GEOBlockLength[x]=ReadBElong f
-	ukw10=ReadBEshort f
-	ukw11=ReadBEshort f
-	MeshCount[x]=ReadBElong f
+	GEOLength[x]=ReadLElong f
+	GEOBlockLength[x]=ReadLElong f
+	ukw10=ReadLEshort f
+	ukw11=ReadLEshort f
+	MeshCount[x]=ReadLElong f
 	fseek f 0x08 #seek_cur
 	
 	Print ("Mesh count is "+(MeshCount[x])as string)
@@ -285,42 +353,44 @@ for x=1 to 	ModelCount do (
 		
 		-- MDL SGEO --
 		MDLSGEO[x] = ReadFixedString f 8 
-		SGEOLength[x]=ReadBElong f
-		SGEOBlockLength[x]=ReadBElong f
-		ukw13=ReadBElong f
-		ukw14=ReadBEshort f
+		SGEOLength[x]=ReadLElong f
+		SGEOBlockLength[x]=ReadLElong f
+		ukw13=ReadLElong f
+		ukw14=ReadLEshort f
 		fseek f 0x0a #seek_cur
-		ukw15=ReadBElong f
-		ukw16=ReadBElong f
+		ukw15=ReadLElong f
+		ukw16=ReadLElong f
 		fseek f 0x08 #seek_cur
-		ukw17=ReadBEShort f
-		ukw18=ReadBEShort f
-		ukw19=ReadBEShort f
-		ukw20=ReadBEShort f
+		ukw17=ReadLEShort f
+		ukw18=ReadLEShort f
+		ukw19=ReadLEShort f
+		ukw20=ReadLEShort f
 		fseek f 0x08 #seek_cur
-		ukw21=ReadBElong f
-		ukw22=ReadBElong f
-		ukw23=ReadBElong f
-		VertSize[x]=ReadBElong f
+		ukw21=ReadLElong f
+		ukw22=ReadLElong f
+		ukw23=ReadLElong f
+		VertSize[x]=ReadLElong f
 		fseek f (SGEOBlockLength[x]-0x50) #seek_cur
 		
 		-- MDL GEOP --
 		MDLGEOP[x] = ReadFixedString f 8 
-		GEOPLength[x]=ReadBElong f
+		GEOPLength[x]=ReadLElong f
 		fseek f 0x04 #seek_cur
-		ukw13=ReadBElong f			--always 3
+		ukw13=ReadLElong f			--always 3
 		fseek f 0x0c #seek_cur
-		VertCount[x]=ReadBElong f
-		ukw14=ReadBElong f			--always 30
-		VertLength[x]=ReadBElong f
-		null=ReadBElong f
-		FaceCount[x]=ReadBElong f
+		VertCount[x]=ReadLElong f
+		ukw14=ReadLElong f			--always 30
+		VertLength[x]=ReadLElong f
+		null=ReadLElong f
+		FaceCount[x]=ReadLElong f
 		fseek f 0x04 #seek_cur			--850
-		FaceLength[x]=ReadBElong f
-		null=ReadBElong f
+		FaceLength[x]=ReadLElong f
+		null=ReadLElong f
 		VertSkip=(VertLength[x]-(VertCount[x]*VertSize[x]))
 		FaceSkip=(FaceLength[x]-(FaceCount[x]*2))
 		
+
+
 		Print ("Mesh offset @ 0x"+((bit.intAsHex(ftell f))as string))
 		Print ("vertex size is 0x"+((bit.intAsHex(VertSize[x]))as string))	
 		Print ("vertex count is 0x"+((bit.intAsHex(VertCount[x]))as string))
@@ -333,9 +403,9 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x18 Do (
 			for x = 1 to VertCount[x] do(
-			vx=ReadBEfloat f
-			vy=ReadBEfloat f
-			vz=ReadBEfloat f
+			vx=ReadLEfloat f
+			vy=ReadLEfloat f
+			vz=ReadLEfloat f
 			fseek f 0x0c #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array[0,0,0]
@@ -344,14 +414,14 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x1c Do (
 			for x = 1 to VertCount[x] do(
-			vx=ReadBEfloat f
-			vy=ReadBEfloat f
-			vz=ReadBEfloat f
-			nx = ReadBEfloat f
-			ny = ReadBEfloat f
-			nz = ReadBEfloat f
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			vx=ReadLEfloat f
+			vy=ReadLEfloat f
+			vz=ReadLEfloat f
+			nx = ReadLEfloat f
+			ny = ReadLEfloat f
+			nz = ReadLEfloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array([tu,(tv*-1),0]*2)
 			append Normal_array [nx,-1*nz,ny]
@@ -360,12 +430,12 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x20 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x0c #seek_cur
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			fseek f 0x04 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array([tu,(tv*-1),0]*2)
@@ -374,14 +444,14 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x24 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
-			nx = ReadBEfloat f
-			ny = ReadBEfloat f
-			nz = ReadBEfloat f
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
+			nx = ReadLEfloat f
+			ny = ReadLEfloat f
+			nz = ReadLEfloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			weight1 = readbyte f#unsigned
 			weight2 = readbyte f#unsigned
 			weight3 = readbyte f#unsigned
@@ -437,12 +507,12 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x28 Do (	-- some models like to be read in beword, gotta find the difference
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x10 #seek_cur
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			fseek f 0x08 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array([(tu*-2),((tv*-2)+1),0])
@@ -451,12 +521,12 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x2c Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x10 #seek_cur
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			fseek f 0x0c #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array([(tu*-2),(tv*-2+1)*1.1,0])
@@ -465,9 +535,9 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x30 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x24 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array[0,0,0]
@@ -476,12 +546,12 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x34 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x24 #seek_cur
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array([tu,(tv*-1),0]*2)
 			)
@@ -489,12 +559,12 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x38 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
-			nx = ReadBEfloat f
-			ny = ReadBEfloat f
-			nz = ReadBEfloat f	
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
+			nx = ReadLEfloat f
+			ny = ReadLEfloat f
+			nz = ReadLEfloat f	
 			fseek f 0x20 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append Normal_array [nx,-1*nz,ny]
@@ -504,13 +574,13 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x3c Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 				
 			fseek f 0x24 #seek_cur
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			fseek f 0x08 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array([(tu*1),(tv*-1),0]*2)
@@ -520,12 +590,12 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x40 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x24 #seek_cur
-			tu=ReadBEHalfFloat f
-			tv=ReadBEHalfFloat f
+			tu=ReadLEHalfFloat f
+			tv=ReadLEHalfFloat f
 			fseek f 0x0c #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array([(tu*1),(tv*-1)+1,0]*2)
@@ -534,9 +604,9 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x44 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x38 #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array[0,0,0]
@@ -545,9 +615,9 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x48 Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x3c #seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array[0,0,0]
@@ -556,9 +626,9 @@ for x=1 to 	ModelCount do (
 		
 		if VertSize[x] == 0x4c Do (
 			for x = 1 to VertCount[x] do(
-			vx = ReadBEfloat f
-			vy = ReadBEfloat f
-			vz = ReadBEfloat f
+			vx = ReadLEfloat f
+			vy = ReadLEfloat f
+			vz = ReadLEfloat f
 			fseek f 0x40#seek_cur
 			append Vert_array([vx,-1*vz,vy]*fscale)
 			append UV_array[0,0,0]
@@ -568,9 +638,9 @@ for x=1 to 	ModelCount do (
 		fseek f VertSkip #seek_cur
 		
 		for x=1 to FaceCount[x]/3 do(
-			fa=ReadBEShort f +1
-			fb=ReadBEShort f +1
-			fc=ReadBEShort f +1
+			fa=ReadLEShort f +1
+			fb=ReadLEShort f +1
+			fc=ReadLEShort f +1
 			append Face_array[fa,fb,fc]
 		)
 		
@@ -641,3 +711,6 @@ deselect $*
 
 gc()
 fclose f
+)
+
+CreateDialog mdlImportRollout
